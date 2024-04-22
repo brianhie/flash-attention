@@ -337,6 +337,7 @@ class MHA(nn.Module):
         softmax_scale=None,
         causal=False,
         layer_idx=None,
+        heads_first=False,
         dwconv=False,
         rotary_emb_dim=0,
         rotary_emb_base=10000.0,
@@ -361,6 +362,7 @@ class MHA(nn.Module):
         self.cross_attn = cross_attn
         self.causal = causal
         self.layer_idx = layer_idx
+        self.heads_first = heads_first
         self.dwconv = dwconv
         self.rotary_emb_dim = rotary_emb_dim
         self.use_flash_attn = use_flash_attn
@@ -576,7 +578,10 @@ class MHA(nn.Module):
                 qkv = rearrange(
                     self.dwconv_qkv(rearrange(qkv, "b s d -> b d s"))[..., :-2], "b d s -> b s d"
                 ).contiguous()
-            qkv = rearrange(qkv, "... (three h d) -> ... three h d", three=3, d=self.head_dim)
+            if self.heads_first:
+                qkv = rearrange(qkv, "... (h three d) -> ... three h d", three=3, d=self.head_dim)
+            else:
+                qkv = rearrange(qkv, "... (three h d) -> ... three h d", three=3, d=self.head_dim)
             if (
                 inference_params is None
                 or inference_params.seqlen_offset == 0
